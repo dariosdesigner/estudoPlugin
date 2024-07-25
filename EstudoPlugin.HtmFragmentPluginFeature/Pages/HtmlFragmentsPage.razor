@@ -1,0 +1,87 @@
+﻿@page "/htmlfragmentspage"
+@using EstudoPlugin.HtmlFragmentPlugin.PluginApi
+@using EstudoPlugin.Plugin.Shared
+@using System.ComponentModel
+@inject PluginListModel<IHtmlFragmentPlugin> PluginProvider
+@implements IDisposable
+
+<PageTitle>Plugins</PageTitle>
+
+<h1>Execute the Plugins</h1>
+
+<p>This component demonstrates showing data.</p>
+
+@if (_fragments == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <p><em>Aqui Contém @_fragments.Count plugins.</em></p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Plugin Output</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var fragment in _fragments)
+            {
+                <tr>
+                    <td>@fragment</td>
+
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<RenderFragment>? _fragments;
+    public void Dispose()
+    {
+        PluginProvider.PropertyChanged -= PluginProvider_PropertyChanged;
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshPluginsAsync().ConfigureAwait(false);
+        PluginProvider.PropertyChanged += PluginProvider_PropertyChanged;
+
+    }
+
+    private async Task RefreshPluginsAsync()
+    {
+        var plugins = PluginProvider.Plugins;
+        List<RenderFragment> fragments = new(plugins.Count);
+        foreach (var plugin in plugins)
+        {
+            var content = await plugin.GetFragmentContentAsync();
+            fragments.Add(new(builder =>
+            {
+                builder.OpenElement(1, "p");
+                builder.AddContent(2, new MarkupString(content));
+                builder.CloseElement();
+            }));
+        }
+        _fragments = fragments;
+    }
+    private async void PluginProvider_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        try
+        {
+            if (e.PropertyName == nameof(PluginProvider.Plugins))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await RefreshPluginsAsync().ConfigureAwait(false);
+                    StateHasChanged();
+                }).ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+            
+        }
+    }
+
+}
